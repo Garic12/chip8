@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdlib>
 #include <imgui.h>
 #include <raylib.h>
 #include <rlImGui.h>
@@ -8,6 +9,45 @@
 constexpr int PIXELSIZE = 16;
 constexpr int DEBUG = 0;
 constexpr int DEBUG_PANEL_WIDTH = 320; // extra window width for the ImGui panel
+
+// Index = CHIP-8 key (0x0–0xF), value = raylib key
+constexpr int KEYMAP[16] = {
+    KEY_X,     // 0
+    KEY_ONE,   // 1
+    KEY_TWO,   // 2
+    KEY_THREE, // 3
+    KEY_Q,     // 4
+    KEY_W,     // 5
+    KEY_E,     // 6
+    KEY_A,     // 7
+    KEY_S,     // 8
+    KEY_D,     // 9
+    KEY_Z,     // A
+    KEY_C,     // B
+    KEY_FOUR,  // C
+    KEY_R,     // D
+    KEY_F,     // E
+    KEY_V,     // F
+};
+
+constexpr uint8_t font[80] = {
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
 
 int load_rom(const char *path, uint8_t *MEM) {
     FILE *file = fopen(path, "rb");
@@ -29,7 +69,8 @@ int load_rom(const char *path, uint8_t *MEM) {
 }
 
 void draw_debug_ui(const uint8_t *MEM, const __uint8_t *PC, __uint16_t opcode,
-                   uint16_t I, const __uint8_t *REG) {
+                   uint16_t I, const __uint8_t *REG,
+                   std::stack<uint8_t *> stack) {
     const int pc_addr = static_cast<int>(PC - MEM);
 
     rlImGuiBegin();
@@ -91,8 +132,37 @@ void draw_debug_ui(const uint8_t *MEM, const __uint8_t *PC, __uint16_t opcode,
         ImGui::EndTable();
     }
 
+    // ---- Stack ----
+    // `stack` is a copy, so popping here doesn't touch the emulator's stack
+    ImGui::SeparatorText("Stack");
+    if (stack.empty()) {
+        ImGui::TextDisabled("(empty)");
+    } else if (ImGui::BeginTable("StackTable", 2,
+                                 ImGuiTableFlags_Borders |
+                                     ImGuiTableFlags_RowBg |
+                                     ImGuiTableFlags_SizingStretchSame)) {
+        ImGui::TableSetupColumn("Level");
+        ImGui::TableSetupColumn("Return Addr");
+        ImGui::TableHeadersRow();
+        // Listed top (most recent call) to bottom
+        for (int level = static_cast<int>(stack.size()) - 1; !stack.empty();
+             --level, stack.pop()) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Text("%d", level);
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%03X", static_cast<int>(stack.top() - MEM));
+        }
+        ImGui::EndTable();
+    }
+
     ImGui::End();
     rlImGuiEnd();
+}
+
+void GatherInput(bool *KB) {
+    for (int i = 0; i < 16; ++i)
+        KB[i] = IsKeyDown(KEYMAP[i]);
 }
 
 int main() {
@@ -100,7 +170,7 @@ int main() {
     // reserve memory
     uint8_t MEM[4096] = {};
 
-    std::stack<__int16_t> STACK;
+    std::stack<uint8_t *> STACK; // Saves PC adresses
     uint8_t REG[16] = {};
 
     // Starting addresses from 000 to 1FF are empty
@@ -117,7 +187,12 @@ int main() {
     uint8_t nibble_third = 0x0;
     uint8_t nibble_fourth = 0x0;
 
+    // Display and Keyboard input
     bool DISP[64][32] = {};
+    bool KB[15] = {false};
+
+    // Load font to memory
+    memcpy(&MEM, font, sizeof(font));
 
     // ---- Load ROM ----
     const char *path = "./ressources/test_opcode.ch8";
@@ -146,9 +221,11 @@ int main() {
         }
 
         for (int i = 0; i < steps; ++i) {
+            GatherInput(KB);
+
             // Fetch
+            bool increase_PC = true;
             opcode = (PC[0] << 8) | PC[1];
-            PC += 2;
 
             // Decode
             nibble_first = (opcode >> 12);
@@ -164,7 +241,8 @@ int main() {
                         memset(DISP, 0, sizeof(DISP));
                     } else if (nibble_third == 0xE && nibble_fourth == 0xE) {
                         // Return from subroutine to address pulled from stack
-
+                        PC = STACK.top();
+                        STACK.pop();
                     } else {
                         printf("Unsupported Opcode: 0x%04X", opcode);
                         return 1;
@@ -172,24 +250,125 @@ int main() {
                     break;
                 default:
                     // Jump to native assembler subroutine at 0xNNN
+                    // This one we don't need for this kind of emulator
                     break;
                 }
                 break;
             case 0x1:
                 // jump to address NNN
                 PC = MEM + (opcode & 0x0FFF);
+                increase_PC = false;
+                break;
+            case 0x2:
+                // Calls subroutine at NNN
+                STACK.push(PC);
+                PC = MEM + (opcode & 0x0FFF);
+                increase_PC = false;
+                break;
+            case 0x3:
+                // skip next opcode if VX == NN
+                if (REG[nibble_second] == (nibble_third << 4) + nibble_fourth)
+                    PC += 2;
+                break;
+            case 0x4:
+                // skip next opcode if VX != NN
+                if (REG[nibble_second] != (nibble_third << 4) + nibble_fourth)
+                    PC += 2;
+                break;
+            case 0x5:
+                // skip next opcode if VX == VY
+                if (REG[nibble_second] == REG[nibble_third])
+                    PC += 2;
                 break;
             case 0x6:
                 // Set the register VX to the value NN
                 *(REG + nibble_second) = (nibble_third << 4) + nibble_fourth;
                 break;
             case 0x7:
+                // add NN to VX
                 *(REG + nibble_second) += (nibble_third << 4) + nibble_fourth;
                 break;
+            case 0x8:
+                // Logical operations
+                switch (nibble_fourth) {
+                case 0:
+                    // SET
+                    REG[nibble_second] = REG[nibble_third];
+                    break;
+                case 1:
+                    // OR
+                    REG[nibble_second] = REG[nibble_second] | REG[nibble_third];
+                    break;
+                case 2:
+                    // AND
+                    REG[nibble_second] = REG[nibble_second] & REG[nibble_third];
+                    break;
+                case 3:
+                    // XOR
+                    REG[nibble_second] = REG[nibble_second] ^ REG[nibble_third];
+                    break;
+                case 4: {
+                    // Add
+                    int o = REG[nibble_second] + REG[nibble_third];
+                    REG[0xF] = (o > 255) ? 1 : 0;
+                    REG[nibble_second] = o;
+                    break;
+                }
+                case 5: {
+                    // Sub VX - VY
+                    int o = REG[nibble_second] - REG[nibble_third];
+                    REG[0xF] = (REG[nibble_second] > REG[nibble_third]) ? 1 : 0;
+                    REG[nibble_second] = o;
+                    break;
+                }
+                case 6:
+                    // Shift
+                    REG[nibble_second] = REG[nibble_third]; // This is a quirk
+                    if (nibble_fourth == 0x6) {
+                        uint8_t flag = REG[nibble_second] & 0x1;
+                        REG[nibble_second] >>= 1;
+                        REG[0xF] = flag;
+                    } else if (nibble_fourth == 0xE) {
+                        uint8_t flag = REG[nibble_second] >> 7;
+                        REG[nibble_second] <<= 1;
+                        REG[0xF] = flag;
+                    } else {
+                        printf(
+                            "Unsupported fourth nibble for operation SHIFT: %X",
+                            nibble_fourth);
+                        return 1;
+                    }
+                    break;
+                case 7: {
+                    // Sub VY - VX
+                    int o = REG[nibble_third] - REG[nibble_second];
+                    REG[0xF] = (REG[nibble_third] > REG[nibble_second]) ? 1 : 0;
+                    REG[nibble_second] = o;
+                    break;
+                }
+                }
+                break;
+            case 0x9:
+                // skip next opcode if VX != VY
+                if (REG[nibble_second] != REG[nibble_third])
+                    PC += 2;
+                break;
             case 0xA:
+                // set I to NNN
                 I = opcode & 0x0FFF;
                 break;
+            case 0xB:
+                // Jump to address NNN + V0
+                PC = MEM + (opcode & 0x0FFF) + REG[0];
+                increase_PC = false;
+                break;
+            case 0xC:
+                // Random
+                REG[nibble_second] =
+                    (uint8_t)rand() & ((nibble_third << 4) + nibble_fourth);
+                break;
             case 0xD: {
+                // Draw to the screen an 8xN sprite located at memory I + row
                 uint8_t N = opcode & 0x000F;
                 uint8_t x0 = REG[nibble_second] % 64;
                 uint8_t y0 = REG[nibble_third] % 32;
@@ -215,7 +394,66 @@ int main() {
                     }
                 }
             } break;
+            case 0xE:
+                if (nibble_third == 9 && nibble_fourth == 0xE) {
+                    // Skip if key
+                    if (KB[nibble_second])
+                        PC += 2;
+                } else if (nibble_third == 0xA && nibble_fourth == 1) {
+                    // Skip if not key
+                    if (!KB[nibble_second])
+                        PC += 2;
+                }
+                break;
+            case 0xF:
+                // Timers
+                uint8_t NN = (nibble_third << 4) + nibble_fourth;
+                switch (NN) {
+                case 0x07:
+                    REG[nibble_second] = delay_timer;
+                    break;
+                case 0x15:
+                    delay_timer = REG[nibble_second];
+                    break;
+                case 0x18:
+                    sound_timer = REG[nibble_second];
+                    break;
+                case 0x1E: {
+                    int o = I + REG[nibble_second];
+                    if (o > 0x1000)
+                        REG[0xF] = 1;
+                    I = o;
+                } break;
+                // Get key pressed
+                case 0x0A: {
+                    bool input_pressed = false;
+                    for (int i = 0; i < 16; ++i) {
+                        if (KB[i]) {
+                            REG[nibble_second] = i;
+                            input_pressed = true;
+                        }
+                    }
+                    if (!input_pressed)
+                        PC -= 2;
+                } break;
+                case 0x29:
+                    // Font Character
+                    break;
+                case 0x33:
+                    // Binary coded decimal conversion
+                    break;
+                case 0x55:
+                    // Store memory
+                    break;
+                case 0x65:
+                    // Read memory
+                    break;
+                }
+                break;
             }
+
+            if (increase_PC)
+                PC += 2;
         }
 
         BeginDrawing();
@@ -224,12 +462,13 @@ int main() {
         for (int x = 0; x < 64; x++) {
             for (int y = 0; y < 32; y++) {
                 if (DISP[x][y])
-                    DrawRectangle(x, y, PIXELSIZE, PIXELSIZE, WHITE);
+                    DrawRectangle(x * PIXELSIZE, y * PIXELSIZE, PIXELSIZE,
+                                  PIXELSIZE, WHITE);
             }
         }
 
         if (DEBUG) {
-            draw_debug_ui(MEM, PC, opcode, I, REG);
+            draw_debug_ui(MEM, PC, opcode, I, REG, STACK);
         }
         EndDrawing();
     }
