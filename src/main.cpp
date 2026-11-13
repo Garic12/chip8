@@ -189,13 +189,13 @@ int main() {
 
     // Display and Keyboard input
     bool DISP[64][32] = {};
-    bool KB[15] = {false};
+    bool KB[16] = {false};
 
     // Load font to memory
     memcpy(&MEM, font, sizeof(font));
 
     // ---- Load ROM ----
-    const char *path = "./ressources/test_opcode.ch8";
+    const char *path = "./ressources/5-quirks.ch8";
 
     if (load_rom(path, PC) == 1) {
         printf("Error reading ROM...\n");
@@ -321,24 +321,20 @@ int main() {
                     REG[nibble_second] = o;
                     break;
                 }
-                case 6:
-                    // Shift
+                case 6: {
+                    // Shift 1 bit right
                     REG[nibble_second] = REG[nibble_third]; // This is a quirk
-                    if (nibble_fourth == 0x6) {
-                        uint8_t flag = REG[nibble_second] & 0x1;
-                        REG[nibble_second] >>= 1;
-                        REG[0xF] = flag;
-                    } else if (nibble_fourth == 0xE) {
-                        uint8_t flag = REG[nibble_second] >> 7;
-                        REG[nibble_second] <<= 1;
-                        REG[0xF] = flag;
-                    } else {
-                        printf(
-                            "Unsupported fourth nibble for operation SHIFT: %X",
-                            nibble_fourth);
-                        return 1;
-                    }
-                    break;
+                    uint8_t flag = REG[nibble_second] & 0x1;
+                    REG[nibble_second] >>= 1;
+                    REG[0xF] = flag;
+                } break;
+                case 0xE: {
+                    // Shift 1 bit left
+                    REG[nibble_second] = REG[nibble_third]; // This is a quirk
+                    uint8_t flag = REG[nibble_second] >> 7;
+                    REG[nibble_second] <<= 1;
+                    REG[0xF] = flag;
+                } break;
                 case 7: {
                     // Sub VY - VX
                     int o = REG[nibble_third] - REG[nibble_second];
@@ -397,11 +393,11 @@ int main() {
             case 0xE:
                 if (nibble_third == 9 && nibble_fourth == 0xE) {
                     // Skip if key
-                    if (KB[nibble_second])
+                    if (KB[REG[nibble_second]])
                         PC += 2;
                 } else if (nibble_third == 0xA && nibble_fourth == 1) {
                     // Skip if not key
-                    if (!KB[nibble_second])
+                    if (!KB[REG[nibble_second]])
                         PC += 2;
                 }
                 break;
@@ -424,29 +420,39 @@ int main() {
                         REG[0xF] = 1;
                     I = o;
                 } break;
-                // Get key pressed
+                // Get key released
                 case 0x0A: {
-                    bool input_pressed = false;
+                    bool key_released = false;
                     for (int i = 0; i < 16; ++i) {
-                        if (KB[i]) {
+                        if (IsKeyReleased(KEYMAP[i])) {
                             REG[nibble_second] = i;
-                            input_pressed = true;
+                            key_released = true;
                         }
                     }
-                    if (!input_pressed)
+                    if (!key_released)
                         PC -= 2;
                 } break;
                 case 0x29:
                     // Font Character
+                    I = REG[nibble_second] * 5;
                     break;
                 case 0x33:
                     // Binary coded decimal conversion
+                    MEM[I] = (REG[nibble_second] / 100) % 10;
+                    MEM[I + 1] = (REG[nibble_second] / 10) % 10;
+                    MEM[I + 2] = REG[nibble_second] % 10;
                     break;
                 case 0x55:
                     // Store memory
+                    for (int i = 0; i <= nibble_second; ++i) {
+                        MEM[I + i] = REG[i];
+                    }
                     break;
                 case 0x65:
                     // Read memory
+                    for (int i = 0; i <= nibble_second; ++i) {
+                        REG[i] = MEM[I + i];
+                    }
                     break;
                 }
                 break;
@@ -456,6 +462,10 @@ int main() {
                 PC += 2;
         }
 
+        if (delay_timer > 0)
+            --delay_timer;
+        if (sound_timer > 0)
+            --sound_timer;
         BeginDrawing();
         ClearBackground({24, 26, 40, 255});
 
