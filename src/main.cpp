@@ -195,7 +195,7 @@ int main() {
     memcpy(&MEM, font, sizeof(font));
 
     // ---- Load ROM ----
-    const char *path = "./ressources/5-quirks.ch8";
+    const char *path = "./ressources/particle.ch8";
 
     if (load_rom(path, PC) == 1) {
         printf("Error reading ROM...\n");
@@ -208,6 +208,14 @@ int main() {
     InitWindow(screenWidth, screenHeight, "Chip-8 Emulator");
     SetTargetFPS(60);
     rlImGuiSetup(true);
+
+    InitAudioDevice();
+    static short beep_samples[44100];
+    for (int i = 0; i < 44100; ++i)
+        beep_samples[i] =
+            (i % 100 < 50) ? 3000 : -3000; // 100 samples per cycle
+    Wave beep_wave = {44100, 44100, 16, 1, beep_samples};
+    Sound beep = LoadSoundFromWave(beep_wave);
 
     const int IPF = 700 / 60; // Instructions per frame
 
@@ -309,16 +317,18 @@ int main() {
                     break;
                 case 4: {
                     // Add
-                    int o = REG[nibble_second] + REG[nibble_third];
-                    REG[0xF] = (o > 255) ? 1 : 0;
-                    REG[nibble_second] = o;
+                    uint8_t flag =
+                        (REG[nibble_second] + REG[nibble_third] > 255) ? 1 : 0;
+                    REG[nibble_second] = REG[nibble_second] + REG[nibble_third];
+                    REG[0xF] = flag;
                     break;
                 }
                 case 5: {
                     // Sub VX - VY
-                    int o = REG[nibble_second] - REG[nibble_third];
-                    REG[0xF] = (REG[nibble_second] > REG[nibble_third]) ? 1 : 0;
-                    REG[nibble_second] = o;
+                    uint8_t flag =
+                        (REG[nibble_second] >= REG[nibble_third]) ? 1 : 0;
+                    REG[nibble_second] = REG[nibble_second] - REG[nibble_third];
+                    REG[0xF] = flag;
                     break;
                 }
                 case 6: {
@@ -337,9 +347,10 @@ int main() {
                 } break;
                 case 7: {
                     // Sub VY - VX
-                    int o = REG[nibble_third] - REG[nibble_second];
-                    REG[0xF] = (REG[nibble_third] > REG[nibble_second]) ? 1 : 0;
-                    REG[nibble_second] = o;
+                    uint8_t flag =
+                        (REG[nibble_third] >= REG[nibble_second]) ? 1 : 0;
+                    REG[nibble_second] = REG[nibble_third] - REG[nibble_second];
+                    REG[0xF] = flag;
                     break;
                 }
                 }
@@ -462,6 +473,14 @@ int main() {
                 PC += 2;
         }
 
+        // each frame, next to your timer decrement
+        if (sound_timer > 0) {
+            if (!IsSoundPlaying(beep))
+                PlaySound(beep);
+        } else if (IsSoundPlaying(beep)) {
+            StopSound(beep);
+        }
+
         if (delay_timer > 0)
             --delay_timer;
         if (sound_timer > 0)
@@ -483,6 +502,7 @@ int main() {
         EndDrawing();
     }
     rlImGuiShutdown();
+    CloseAudioDevice();
     CloseWindow();
     return 0;
 }
