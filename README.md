@@ -1,5 +1,7 @@
 # CHIP-8 Emulator
 
+[![CI](https://github.com/Garic12/chip8/actions/workflows/ci.yml/badge.svg)](https://github.com/Garic12/chip8/actions/workflows/ci.yml)
+
 A CHIP-8 emulator written in C++, with a raylib frontend and an ImGui debugger.
 
 ![Demo Screen](docs/demo.gif)
