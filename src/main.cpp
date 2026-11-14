@@ -1,11 +1,32 @@
 #include "audio.h"
 #include "chip8.h"
+#include "debug_ui.h"
 #include <cstdio>
 #include <raylib.h>
 #include <rlImGui.h>
 #include <span>
 #include <string>
 #include <string_view>
+
+// Index = CHIP-8 key (0x0–0xF), value = raylib key
+constexpr std::array<int, 16> KEYMAP = {
+    KEY_X,     // 0
+    KEY_ONE,   // 1
+    KEY_TWO,   // 2
+    KEY_THREE, // 3
+    KEY_Q,     // 4
+    KEY_W,     // 5
+    KEY_E,     // 6
+    KEY_A,     // 7
+    KEY_S,     // 8
+    KEY_D,     // 9
+    KEY_Z,     // A
+    KEY_C,     // B
+    KEY_FOUR,  // C
+    KEY_R,     // D
+    KEY_F,     // E
+    KEY_V,     // F
+};
 
 constexpr int FPS = 60;
 constexpr int IPF = 700 / FPS; // Instructions per frame
@@ -26,7 +47,7 @@ int main(int argc, char *argv[]) {
         } else if (arg == "--debug") {
             debug = true;
         } else if (arg.starts_with("--")) {
-            printf("Usage: %s [--no-audio] <rom.ch8>\n", args[0]);
+            printf("Usage: %s [--no-audio|--debug] <rom.ch8>\n", args[0]);
             return 1;
         } else {
             path = arg;
@@ -34,7 +55,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (path.empty()) {
-        printf("Usage: %s [--no-audio] <rom.ch8>\n", args[0]);
+        printf("Usage: %s [--no-audio|--debug] <rom.ch8>\n", args[0]);
         return 1;
     }
 
@@ -60,7 +81,9 @@ int main(int argc, char *argv[]) {
     // ---- Chip-8 Init ----
     chip8::Chip8 c;
     chip8::init(c);
-    chip8::load(c, path);
+    if (!chip8::load(c, path)) {
+        printf("Failed to load ROM\n");
+    }
 
     while (!WindowShouldClose()) {
         int steps = 0;
@@ -72,6 +95,13 @@ int main(int argc, char *argv[]) {
         }
 
         for (int i = 0; i < steps; ++i) {
+            for (int i = 0; i < 16; ++i) {
+                if (IsKeyReleased(KEYMAP[i])) {
+                    c.KB[i] = 2;
+                } else if (IsKeyDown(KEYMAP[i])) {
+                    c.KB[i] = 1;
+                }
+            }
             if (!chip8::step(c)) {
                 return 1;
             }
@@ -95,8 +125,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (debug) {
-            chip8::draw_debug(c, 64 * PIXELSIZE, 0.0, DEBUG_PANEL_WIDTH,
-                              32 * PIXELSIZE);
+            draw_debug(c, 64 * PIXELSIZE, 0.0, DEBUG_PANEL_WIDTH,
+                       32 * PIXELSIZE);
         }
         EndDrawing();
     }
