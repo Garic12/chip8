@@ -25,8 +25,6 @@ on the system. Dear ImGui, rlImGui and Catch2 are downloaded automatically by CM
 ./run.bash <rom.ch8>
 ```
 
-or manually:
-
 ## Usage
 
 ```
