@@ -76,11 +76,11 @@ int main(int argc, char *argv[]) {
                 printf("Executing emulator step failed.\n");
                 return 1;
             }
+            if (audio_enabled) {
+                audio_update(audio, c.sound > 0);
+            }
         }
         chip8::tick_timers(c);
-        if (audio_enabled) {
-            audio_update(audio, c.sound > 0);
-        }
 
         BeginDrawing();
         for (int x = 0; x < 64; x++) {

@@ -25,7 +25,7 @@ Audio audio_init() {
 void audio_update(Audio &audio, bool sound) {
     if (!IsSoundPlaying(audio.beep) && sound) {
         PlaySound(audio.beep);
-    } else if (IsSoundPlaying(audio.beep)) {
+    } else if (IsSoundPlaying(audio.beep) && !sound) {
         StopSound(audio.beep);
     }
 }
