@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i < steps; ++i) {
             if (!chip8::step(c)) {
-                printf("Executing emulator step failed.\n");
                 return 1;
             }
             if (audio_enabled) {

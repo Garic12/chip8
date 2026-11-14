@@ -195,13 +195,10 @@ bool step(Chip8 &c) {
             } else if (y == 0xE && n == 0xE) {
                 // Return from subroutine to address pulled from stack
                 if (c.SP <= 0) {
-                    printf("Stack underflow: 00EE with empty stack at 0x%03X\n",
-                           c.PC);
                     return false;
                 }
                 c.PC = c.STACK[--c.SP];
             } else {
-                printf("Unsupported Opcode: 0x%04X\n", opcode);
                 return false;
             }
             break;
@@ -219,7 +216,6 @@ bool step(Chip8 &c) {
     case 0x2:
         // Calls subroutine at NNN
         if (c.SP >= 16) {
-            printf("Stack overflow: 2NNN with full stack at 0x%03X\n", c.PC);
             return false;
         }
         c.STACK[c.SP++] = c.PC;
@@ -429,12 +425,10 @@ bool step(Chip8 &c) {
             }
             break;
         default:
-            printf("Unsupported Opcode: 0x%04X\n", opcode);
             return false;
         }
         break;
     default:
-        printf("Unsupported Opcode: 0x%04X\n", opcode);
         return false;
     }
 

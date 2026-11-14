@@ -15,7 +15,11 @@ Checks: >
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
   -cppcoreguidelines-owning-memory,
-  -cppcoreguidelines-pro-bounds-constant-array-index,
+
+CheckOptions:
+  # Catch2/doctest REQUIRE/CHECK expand to do { } while(false)
+  - key: cppcoreguidelines-avoid-do-while.IgnoreMacros
+    value: true
 
 # Only report warnings from our own headers, not raylib/imgui
 HeaderFilterRegex: 'src/.*'

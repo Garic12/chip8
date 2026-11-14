@@ -38,7 +38,31 @@ target_include_directories(imgui_rl SYSTEM PUBLIC
 )
 target_link_libraries(imgui_rl PUBLIC raylib)
 
-# ---- Emulator ----
-add_executable(chip8 src/main.cpp src/chip8.cpp src/audio.cpp)
-target_link_libraries(chip8 PRIVATE raylib imgui_rl)
+# ---- Emulator core ----
+add_library(chip8_core STATIC src/chip8.cpp)
+target_include_directories(chip8_core PUBLIC src)
+target_compile_options(chip8_core PRIVATE -Wall -Wextra -Wpedantic)
+# TODO: remove once input (IsKeyDown/IsKeyReleased) and draw_debug
+# are moved out of chip8.cpp -- the core should not depend on raylib.
+target_link_libraries(chip8_core PUBLIC imgui_rl)
+
+# ---- Emulator app ----
+add_executable(chip8 src/main.cpp src/audio.cpp)
+target_link_libraries(chip8 PRIVATE chip8_core raylib imgui_rl)
 target_compile_options(chip8 PRIVATE -Wall -Wextra -Wpedantic)
+
+# ---- Tests ----
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.8.1
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(Catch2)
+
+add_executable(chip8_tests tests/test_opcodes.cpp)
+target_link_libraries(chip8_tests PRIVATE chip8_core Catch2::Catch2WithMain)
+
+enable_testing()
+include(${catch2_SOURCE_DIR}/extras/Catch.cmake)
+catch_discover_tests(chip8_tests)
