@@ -39,6 +39,6 @@ target_include_directories(imgui_rl SYSTEM PUBLIC
 target_link_libraries(imgui_rl PUBLIC raylib)
 
 # ---- Emulator ----
-add_executable(chip8 src/main.cpp src/chip8.cpp)
+add_executable(chip8 src/main.cpp src/chip8.cpp src/audio.cpp)
 target_link_libraries(chip8 PRIVATE raylib imgui_rl)
 target_compile_options(chip8 PRIVATE -Wall -Wextra -Wpedantic)

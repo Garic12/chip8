@@ -1,25 +1,27 @@
 #pragma once
+#include <array>
 #include <cstdint>
-#include <raylib.h>
+#include <string>
 
 constexpr int DISP_W = 64, DISP_H = 32;
 
+namespace chip8 {
 struct Chip8 {
-        uint8_t MEM[4096];
-        uint8_t REG[16];
-        uint16_t STACK[16];
-        int16_t SP;
-        uint16_t PC;
-        uint16_t I;
-        uint8_t delay, sound;
-        bool DISP[64][32];
-        bool KB[16];
-        uint32_t rng;
-        Sound beep;
+        std::array<uint8_t, 4096> MEM = {};
+        std::array<uint8_t, 16> REG = {};
+        std::array<uint16_t, 16> STACK = {};
+        std::array<std::array<bool, 32>, 64> DISP{};
+        std::array<bool, 16> KB = {};
+        int16_t SP = 0;
+        uint16_t PC = 0x200;
+        uint16_t I = 0;
+        uint8_t delay = 0, sound = 0;
+        uint32_t rng = 12345;
 };
 
-void chip8_init(Chip8 &c);
-bool chip8_load(Chip8 &c, const char *path);
-bool chip8_step(Chip8 &c);
-void chip8_tick_timers(Chip8 &c);
-void chip8_draw_debug(const Chip8 &c, float x, float y, float w, float h);
+void init(Chip8 &c);
+bool load(Chip8 &c, std::string &path);
+bool step(Chip8 &c);
+void tick_timers(Chip8 &c);
+void draw_debug(const Chip8 &c, float x, float y, float w, float h);
+} // namespace chip8

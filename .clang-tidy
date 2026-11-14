@@ -1,0 +1,21 @@
+Checks: >
+  -*,
+  misc-include-cleaner,
+  bugprone-*,
+  modernize-*,
+  readability-*,
+  performance-*,
+  cppcoreguidelines-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+
+# Only report warnings from our own headers, not raylib/imgui
+HeaderFilterRegex: 'src/.*'
