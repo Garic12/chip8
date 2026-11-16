@@ -217,16 +217,9 @@ bool step(Chip8 &c) {
         }
     } break;
     case 0xE:
-        if (y == 9 && n == 0xE) {
-            // Skip if key
-            if (c.KB[c.REG[x]] == 1) {
-                c.PC += 2;
-            }
-        } else if (y == 0xA && n == 1) {
-            // Skip if not key
-            if (!(c.KB[c.REG[x]] == 1)) {
-                c.PC += 2;
-            }
+        if (((y == 9 && n == 0xE) && (c.KB[c.REG[x]] == 1))
+            || ((y == 0xA && n == 1) && (c.KB[c.REG[x]] == 0))) {
+            c.PC += 2;
         }
         break;
     case 0xF:
@@ -243,8 +236,10 @@ bool step(Chip8 &c) {
             break;
         case 0x1E: {
             int o = c.I + c.REG[x];
-            if (o > 0x1000) {
+            if (o >= 0x1000) {
                 c.REG[0xF] = 1;
+            } else {
+                c.REG[0xF] = 0;
             }
             c.I = o;
         } break;

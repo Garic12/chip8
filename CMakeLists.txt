@@ -16,7 +16,20 @@ target_compile_options(chip8_core PRIVATE -Wall -Wextra -Wpedantic)
 
 # ---- Emulator app ----
 if(CHIP8_BUILD_APP)
-    find_package(raylib REQUIRED)
+    # Use an installed raylib if available, otherwise fetch and build it.
+    find_package(raylib 5.5 QUIET)
+    if(NOT raylib_FOUND)
+        message(STATUS "raylib not found, fetching it with FetchContent")
+        set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            raylib
+            GIT_REPOSITORY https://github.com/raysan5/raylib.git
+            GIT_TAG        5.5
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(raylib)
+    endif()
 
     # ---- Dear ImGui + rlImGui ----
     FetchContent_Declare(
